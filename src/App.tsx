@@ -11,9 +11,11 @@ import {
   Smartphone,
   Star,
   X,
-  Check
+  Check,
+  HeartPulse,
+  RefreshCw
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, ReactNode } from 'react';
 
 function Counter({ end, suffix = '', prefix = '' }: { end: number, suffix?: string, prefix?: string }) {
   const [count, setCount] = useState(0);
@@ -48,10 +50,57 @@ export default function App() {
   const balance = (steps * 0.01).toFixed(2); // 1 step = 1 paisa (0.01 INR)
   const [isWalletOpen, setIsWalletOpen] = useState(false);
   const [withdrawState, setWithdrawState] = useState<'idle' | 'processing' | 'success'>('idle');
+  
+  // Health Integration States
+  const [isHealthConnected, setIsHealthConnected] = useState(false);
+  const [showHealthModal, setShowHealthModal] = useState(false);
+  const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'success'>('idle');
+  const [connectedProvider, setConnectedProvider] = useState<'Google Fit' | 'Apple Health' | null>(null);
 
   const handleSimulateWalk = () => {
     setSteps(prev => prev + 1);
   };
+
+  const handleDownloadAPK = () => {
+    const content = "This is a dummy APK file for StridePay simulation.";
+    const blob = new Blob([content], { type: "application/vnd.android.package-archive" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "StridePay_v1.0_Alpha.apk";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleConnectHealth = (provider: 'Google Fit' | 'Apple Health') => {
+    setSyncState('syncing');
+    setConnectedProvider(provider);
+    // Simulate OAuth and API fetch
+    setTimeout(() => {
+      setSyncState('success');
+      setSteps(prev => prev + 1250); // Simulate fetching historical steps
+      setTimeout(() => {
+        setIsHealthConnected(true);
+        setShowHealthModal(false);
+        setSyncState('idle');
+      }, 1500);
+    }, 2000);
+  };
+
+  // Simulate live step updates when connected
+  useEffect(() => {
+    if (isHealthConnected) {
+      const interval = setInterval(() => {
+        // Simulate user walking: add 1-3 steps randomly every few seconds
+        if (Math.random() > 0.3) {
+          setSteps(prev => prev + Math.floor(Math.random() * 3) + 1);
+        }
+      }, 2500);
+      return () => clearInterval(interval);
+    }
+  }, [isHealthConnected]);
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-emerald-200 selection:text-emerald-900">
@@ -69,7 +118,7 @@ export default function App() {
             <a href="#how-it-works" className="hover:text-emerald-600 transition-colors">How it Works</a>
             <a href="#community" className="hover:text-emerald-600 transition-colors">Hyderabad Community</a>
           </div>
-          <button className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2">
+          <button onClick={handleDownloadAPK} className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2">
             <Download className="w-4 h-4" />
             <span className="hidden sm:inline">Get APK</span>
           </button>
@@ -99,7 +148,7 @@ export default function App() {
               Join thousands of users earning digital vouchers, UPI cash, and exclusive local discounts just by hitting their daily step goals.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
-              <button className="bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-4 rounded-full text-lg font-semibold transition-all transform hover:scale-105 shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2">
+              <button onClick={handleDownloadAPK} className="bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-4 rounded-full text-lg font-semibold transition-all transform hover:scale-105 shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2">
                 <Download className="w-5 h-5" />
                 Download APK Now
               </button>
@@ -151,10 +200,24 @@ export default function App() {
                     <span>0</span>
                     <span>Goal: 10,000</span>
                   </div>
-                  <button onClick={handleSimulateWalk} className="w-full bg-white/20 hover:bg-white/30 text-white py-3 rounded-xl text-sm font-medium backdrop-blur-sm transition-colors flex items-center justify-center gap-2 active:scale-95">
-                    <Activity className="w-4 h-4" />
-                    Simulate 1 Step (4m) = 1 Paisa
-                  </button>
+                  
+                  {!isHealthConnected ? (
+                    <button onClick={() => setShowHealthModal(true)} className="w-full bg-white text-emerald-600 hover:bg-emerald-50 py-3 rounded-xl text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 active:scale-95">
+                      <HeartPulse className="w-4 h-4" />
+                      Connect Health App
+                    </button>
+                  ) : (
+                    <div className="w-full bg-white/20 py-3 rounded-xl text-sm font-medium backdrop-blur-sm flex items-center justify-between px-4">
+                      <div className="flex items-center gap-2">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+                        </span>
+                        <span>Live Sync Active</span>
+                      </div>
+                      <span className="text-emerald-100 text-xs">{connectedProvider}</span>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="p-6 flex-1 flex flex-col gap-4">
@@ -191,20 +254,6 @@ export default function App() {
               </div>
             </div>
             
-            {/* Floating Elements */}
-            <motion.div 
-              animate={{ y: [0, -10, 0] }}
-              transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
-              className="absolute top-20 -left-12 bg-white p-4 rounded-2xl shadow-xl border border-slate-100 flex items-center gap-3"
-            >
-              <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-emerald-600" />
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 font-medium">Just earned</p>
-                <p className="text-sm font-bold text-slate-900">₹50 UPI Transfer</p>
-              </div>
-            </motion.div>
           </motion.div>
         </div>
       </section>
@@ -335,7 +384,7 @@ export default function App() {
           <p className="text-xl text-slate-300 mb-10 max-w-2xl mx-auto">
             Download the StridePay APK today and start earning rewards for your daily activity.
           </p>
-          <button className="bg-emerald-500 hover:bg-emerald-400 text-white px-10 py-5 rounded-full text-xl font-bold transition-all transform hover:scale-105 shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-3 mx-auto">
+          <button onClick={handleDownloadAPK} className="bg-emerald-500 hover:bg-emerald-400 text-white px-10 py-5 rounded-full text-xl font-bold transition-all transform hover:scale-105 shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-3 mx-auto">
             <Download className="w-6 h-6" />
             Download APK (v1.0 Alpha)
           </button>
@@ -429,11 +478,70 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Health Connection Modal */}
+      {showHealthModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl relative animate-in zoom-in-95 duration-200">
+            <button onClick={() => setShowHealthModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors">
+               <X className="w-6 h-6" />
+            </button>
+            
+            {syncState === 'idle' && (
+              <>
+                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-4">
+                  <HeartPulse className="w-8 h-8 text-emerald-500" />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-900 mb-2">Connect Health Data</h2>
+                <p className="text-slate-600 mb-6">Sync your daily steps automatically to earn rewards without keeping the app open.</p>
+                
+                <div className="space-y-3">
+                  <button onClick={() => handleConnectHealth('Google Fit')} className="w-full border-2 border-slate-200 hover:border-blue-500 hover:bg-blue-50 p-4 rounded-xl flex items-center gap-4 transition-all group">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Google_Fit_icon_%282018%29.svg/512px-Google_Fit_icon_%282018%29.svg.png" alt="Google Fit" className="w-8 h-8 object-contain" />
+                    <div className="text-left">
+                      <p className="font-bold text-slate-900 group-hover:text-blue-700 transition-colors">Google Fit</p>
+                      <p className="text-xs text-slate-500">For Android devices</p>
+                    </div>
+                  </button>
+                  
+                  <button onClick={() => handleConnectHealth('Apple Health')} className="w-full border-2 border-slate-200 hover:border-rose-500 hover:bg-rose-50 p-4 rounded-xl flex items-center gap-4 transition-all group">
+                    <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
+                      <svg className="w-5 h-5 text-white" viewBox="0 0 384 512" fill="currentColor"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>
+                    </div>
+                    <div className="text-left">
+                      <p className="font-bold text-slate-900 group-hover:text-rose-700 transition-colors">Apple Health</p>
+                      <p className="text-xs text-slate-500">For iOS devices</p>
+                    </div>
+                  </button>
+                </div>
+              </>
+            )}
+
+            {syncState === 'syncing' && (
+              <div className="text-center py-8">
+                <RefreshCw className="w-12 h-12 text-emerald-500 animate-spin mx-auto mb-4" />
+                <h3 className="text-xl font-bold text-slate-900 mb-2">Connecting to {connectedProvider}...</h3>
+                <p className="text-slate-600">Securely fetching your activity data.</p>
+              </div>
+            )}
+
+            {syncState === 'success' && (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Check className="w-8 h-8 text-emerald-500" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 mb-2">Successfully Connected!</h3>
+                <p className="text-slate-600">Your steps are now syncing automatically.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function FeatureCard({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) {
+function FeatureCard({ icon, title, description }: { icon: ReactNode, title: string, description: string }) {
   return (
     <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100 hover:border-emerald-200 hover:shadow-lg hover:shadow-emerald-100/50 transition-all group">
       <div className="w-14 h-14 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
